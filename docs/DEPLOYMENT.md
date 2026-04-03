@@ -17,6 +17,11 @@ This brings up:
 - Redis on `6379`
 - MQTT broker on `1883`
 
+The backend uses `DATABASE_URL`:
+
+- local default: SQLite for zero-setup development
+- Docker default: PostgreSQL service from Compose
+
 ## Production Direction
 
 - run backend and AI services behind a reverse proxy
@@ -24,4 +29,3 @@ This brings up:
 - use managed PostgreSQL where possible
 - put MQTT behind authentication and network segmentation
 - serve the dashboard through a hardened frontend hosting layer
-

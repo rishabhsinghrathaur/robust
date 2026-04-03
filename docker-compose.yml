@@ -4,8 +4,12 @@ services:
   backend:
     build:
       context: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://robust:robust_dev_password@postgres:5432/robust
     ports:
       - "${API_PORT:-8000}:8000"
+    depends_on:
+      - postgres
 
   ai:
     build:

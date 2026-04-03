@@ -135,7 +135,7 @@ This repository is currently scaffolded as a multi-service project with separate
 
 ### Services
 
-- `backend`: FastAPI control plane for devices, OTA metadata, and command dispatch
+- `backend`: FastAPI control plane for devices, OTA metadata, command dispatch, and persistent fleet state
 - `dashboard`: React + Vite operator dashboard
 - `ai`: FastAPI service that converts natural language into structured, reviewable device actions
 - `firmware`: reference layout for ESP32 and STM32 device firmware

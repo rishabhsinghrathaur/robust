@@ -21,6 +21,7 @@ build/
 coverage/
 __pycache__/
 *.pyc
+*.db
 
 # Embedded / firmware artifacts
 *.bin
