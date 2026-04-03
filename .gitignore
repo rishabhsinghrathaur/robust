@@ -1,0 +1,29 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.codex
+
+# Logs
+*.log
+logs/
+
+# Secrets / environment
+.env
+.env.*
+!.env.example
+
+# Dependencies / build
+node_modules/
+dist/
+build/
+coverage/
+__pycache__/
+*.pyc
+
+# Embedded / firmware artifacts
+*.bin
+*.elf
+*.map
+.pio/
