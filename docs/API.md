@@ -28,6 +28,7 @@ Example payload:
 ### `POST /devices/{device_id}/commands`
 
 Queues a command for a registered device.
+Requires bearer token with at least `operator` role.
 
 Example payload:
 
@@ -68,6 +69,21 @@ Returns recent command and release events for the dashboard activity feed.
 ### `POST /ota/releases`
 
 Creates OTA metadata for a release artifact.
+Requires bearer token with `admin` role.
+
+### `GET /commands`
+
+Returns queued commands across the fleet.
+Requires bearer token with at least `viewer` role.
+
+### `GET /ota/releases`
+
+Returns known OTA releases.
+Requires bearer token with at least `viewer` role.
+
+### `GET /auth/whoami`
+
+Returns the resolved role for the current bearer token.
 
 ## AI Service
 
@@ -107,3 +123,13 @@ The AI service can run in:
 ## Design Rule
 
 AI outputs are advisory. Device execution must still pass backend authorization and policy checks.
+
+## Auth
+
+Protected backend routes use `Authorization: Bearer <token>`.
+
+Default development roles:
+
+- `viewer-dev-token`
+- `operator-dev-token`
+- `admin-dev-token`

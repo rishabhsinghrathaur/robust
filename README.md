@@ -154,6 +154,8 @@ This repository is currently scaffolded as a multi-service project with separate
 - GitHub Actions CI runs on pushes and pull requests through [ci.yml](/home/rishabh/Desktop/current%20projects%20/robust/.github/workflows/ci.yml)
 - container build paths are defined for backend, dashboard, and AI services
 - deployment guidance is outlined in [docs/DEPLOYMENT.md](/home/rishabh/Desktop/current%20projects%20/robust/docs/DEPLOYMENT.md)
+- backend schema migrations are included through Alembic in [backend/migrations](/home/rishabh/Desktop/current%20projects%20/robust/backend/migrations/README)
+- backend protected routes now use role-based bearer tokens for `viewer`, `operator`, and `admin`
 
 ### Open Source Direction
 

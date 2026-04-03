@@ -1,19 +1,20 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from .db import Base, SessionLocal, engine
+from .auth import AuthContext, require_role
+from .db import AUTO_CREATE_SCHEMA, AUTO_SEED_DEMO_DATA, Base, SessionLocal, engine
 from .models import Command, Device, OtaRelease, TelemetryRecord
 
 
 app = FastAPI(
     title="Robust Backend",
     description="Control plane API for device registration, fleet management, and OTA metadata.",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 app.add_middleware(
@@ -171,13 +172,20 @@ def seed_demo_data() -> None:
         session.commit()
 
 
-Base.metadata.create_all(bind=engine)
-seed_demo_data()
+if AUTO_CREATE_SCHEMA:
+    Base.metadata.create_all(bind=engine)
+if AUTO_SEED_DEMO_DATA:
+    seed_demo_data()
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "backend"}
+
+
+@app.get("/auth/whoami")
+def whoami(context: AuthContext = Depends(require_role("viewer"))) -> dict[str, str]:
+    return context.model_dump()
 
 
 @app.get("/devices")
@@ -286,7 +294,11 @@ def register_device(payload: DeviceRegistrationRequest) -> dict:
 
 
 @app.post("/devices/{device_id}/commands")
-def issue_command(device_id: str, payload: CommandRequest) -> dict:
+def issue_command(
+    device_id: str,
+    payload: CommandRequest,
+    _: AuthContext = Depends(require_role("operator")),
+) -> dict:
     with SessionLocal() as session:
         device = session.get(Device, device_id)
         if not device:
@@ -333,14 +345,17 @@ def record_telemetry(device_id: str, payload: TelemetryEvent) -> dict:
 
 
 @app.get("/commands")
-def list_commands() -> dict[str, list[dict]]:
+def list_commands(_: AuthContext = Depends(require_role("viewer"))) -> dict[str, list[dict]]:
     with SessionLocal() as session:
         commands = session.scalars(select(Command).order_by(Command.created_at.desc())).all()
         return {"commands": [serialize_command(command) for command in commands]}
 
 
 @app.post("/ota/releases")
-def create_release(payload: OtaReleaseRequest) -> dict:
+def create_release(
+    payload: OtaReleaseRequest,
+    _: AuthContext = Depends(require_role("admin")),
+) -> dict:
     with SessionLocal() as session:
         release = OtaRelease(
             id=str(uuid4()),
@@ -357,7 +372,7 @@ def create_release(payload: OtaReleaseRequest) -> dict:
 
 
 @app.get("/ota/releases")
-def list_releases() -> dict[str, list[dict]]:
+def list_releases(_: AuthContext = Depends(require_role("viewer"))) -> dict[str, list[dict]]:
     with SessionLocal() as session:
         releases = session.scalars(select(OtaRelease).order_by(OtaRelease.created_at.desc())).all()
         return {"releases": [serialize_release(release) for release in releases]}
