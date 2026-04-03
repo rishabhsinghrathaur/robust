@@ -17,3 +17,12 @@ The dashboard is the operator-facing UI for device visibility, command dispatch,
 - build device detail route
 - add live updates with WebSocket or polling
 
+## Local Development
+
+```bash
+npm install
+npm run dev
+```
+
+Set `VITE_API_BASE_URL` if the backend is not running at `http://localhost:8000`.
+

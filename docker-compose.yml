@@ -1,6 +1,26 @@
 version: "3.9"
 
 services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+  ai:
+    build:
+      context: ./ai
+    ports:
+      - "${AI_PORT:-8100}:8100"
+
+  dashboard:
+    build:
+      context: ./dashboard
+    environment:
+      VITE_API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "${DASHBOARD_PORT:-5173}:5173"
+
   postgres:
     image: postgres:16-alpine
     environment:

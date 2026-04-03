@@ -3,6 +3,7 @@ from typing import Literal
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 
@@ -10,6 +11,14 @@ app = FastAPI(
     title="Robust Backend",
     description="Control plane API for device registration, fleet management, and OTA metadata.",
     version="0.1.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -37,6 +46,69 @@ commands: list[dict] = []
 releases: list[dict] = []
 
 
+def seed_demo_data() -> None:
+    if devices:
+        return
+
+    initial_devices = [
+        {
+            "id": str(uuid4()),
+            "device_uid": "RB-ESP32-01",
+            "device_type": "esp32",
+            "firmware_version": "1.0.3",
+            "site": "Lab A",
+            "status": "online",
+            "last_seen_at": datetime.now(UTC).isoformat(),
+        },
+        {
+            "id": str(uuid4()),
+            "device_uid": "RB-STM32-07",
+            "device_type": "stm32",
+            "firmware_version": "1.1.0",
+            "site": "Field 2",
+            "status": "updating",
+            "last_seen_at": datetime.now(UTC).isoformat(),
+        },
+        {
+            "id": str(uuid4()),
+            "device_uid": "RB-ESP32-19",
+            "device_type": "esp32",
+            "firmware_version": "0.9.8",
+            "site": "Greenhouse",
+            "status": "offline",
+            "last_seen_at": datetime.now(UTC).isoformat(),
+        },
+    ]
+
+    for device in initial_devices:
+        devices[device["id"]] = device
+
+    releases.append(
+        {
+            "id": str(uuid4()),
+            "version": "1.1.0",
+            "hardware_target": "esp32",
+            "artifact_url": "https://example.com/firmware/esp32/1.1.0.bin",
+            "mandatory": False,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+    )
+
+    commands.append(
+        {
+            "id": str(uuid4()),
+            "device_id": initial_devices[0]["id"],
+            "command": "sync-config",
+            "issued_by": "system",
+            "status": "queued",
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+    )
+
+
+seed_demo_data()
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "backend"}
@@ -45,6 +117,22 @@ def health() -> dict[str, str]:
 @app.get("/devices")
 def list_devices() -> dict[str, list[dict]]:
     return {"devices": list(devices.values())}
+
+
+@app.get("/dashboard/summary")
+def dashboard_summary() -> dict:
+    total_devices = len(devices)
+    online_devices = sum(1 for device in devices.values() if device["status"] == "online")
+    stale_devices = sum(1 for device in devices.values() if device["status"] != "online")
+    sites = len({device["site"] for device in devices.values()})
+    return {
+        "managed_devices": total_devices,
+        "healthy_percent": round((online_devices / total_devices) * 100) if total_devices else 0,
+        "devices_needing_attention": stale_devices,
+        "active_sites": sites,
+        "queued_commands": len(commands),
+        "available_releases": len(releases),
+    }
 
 
 @app.post("/devices/register")
@@ -103,4 +191,3 @@ def create_release(payload: OtaRelease) -> dict:
 @app.get("/ota/releases")
 def list_releases() -> dict[str, list[dict]]:
     return {"releases": releases}
-

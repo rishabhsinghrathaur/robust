@@ -143,9 +143,16 @@ This repository is currently scaffolded as a multi-service project with separate
 ### Quick Start
 
 1. Copy [.env.example](/home/rishabh/Desktop/current%20projects%20/robust/.env.example) to `.env`.
-2. Review each service README for local setup.
-3. Use [docker-compose.yml](/home/rishabh/Desktop/current%20projects%20/robust/docker-compose.yml) as the initial orchestration reference.
-4. Expand the starter implementations into production-ready services incrementally.
+2. Start the local stack with [docker-compose.yml](/home/rishabh/Desktop/current%20projects%20/robust/docker-compose.yml) or run services individually.
+3. Review each service README for local setup details.
+4. Use [Makefile](/home/rishabh/Desktop/current%20projects%20/robust/Makefile) for common local commands.
+5. Expand the starter implementations into production-ready services incrementally.
+
+### CI and Delivery
+
+- GitHub Actions CI runs on pushes and pull requests through [ci.yml](/home/rishabh/Desktop/current%20projects%20/robust/.github/workflows/ci.yml)
+- container build paths are defined for backend, dashboard, and AI services
+- deployment guidance is outlined in [docs/DEPLOYMENT.md](/home/rishabh/Desktop/current%20projects%20/robust/docs/DEPLOYMENT.md)
 
 ## Feedback and Improvement Areas
 
@@ -208,4 +215,3 @@ Start here:
 ## License
 
 This project is released under the MIT License. See [LICENSE](/home/rishabh/Desktop/current projects /robust/LICENSE).
-
