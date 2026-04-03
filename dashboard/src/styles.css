@@ -180,6 +180,19 @@ button {
   background: rgba(255, 255, 255, 0.6);
 }
 
+.actionList strong,
+.detailList strong {
+  display: block;
+  text-transform: capitalize;
+  margin-bottom: 4px;
+}
+
+.actionList small,
+.detailList span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .actionList button {
   border: 0;
   border-radius: 999px;
@@ -214,6 +227,14 @@ tbody tr:last-child td {
   border-bottom: 0;
 }
 
+.selectedRow {
+  background: rgba(184, 76, 42, 0.06);
+}
+
+tbody tr {
+  cursor: pointer;
+}
+
 .status {
   display: inline-flex;
   align-items: center;
@@ -239,6 +260,42 @@ tbody tr:last-child td {
   color: #5c4f48;
 }
 
+.detailGrid {
+  margin-top: 24px;
+}
+
+.detailCard {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.detailCard div,
+.detailList li {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.detailCard strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.detailCard span {
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.detailList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
 @media (max-width: 900px) {
   .hero,
   .grid {
@@ -252,5 +309,9 @@ tbody tr:last-child td {
 
   .hero h1 {
     max-width: 14ch;
+  }
+
+  .detailCard {
+    grid-template-columns: 1fr;
   }
 }

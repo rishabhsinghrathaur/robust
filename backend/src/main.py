@@ -41,9 +41,17 @@ class OtaRelease(BaseModel):
     mandatory: bool = False
 
 
+class TelemetryEvent(BaseModel):
+    temperature_c: float | None = None
+    battery_percent: int | None = None
+    connectivity: Literal["good", "degraded", "offline"] = "good"
+    message: str | None = None
+
+
 devices: dict[str, dict] = {}
 commands: list[dict] = []
 releases: list[dict] = []
+telemetry_events: dict[str, list[dict]] = {}
 
 
 def seed_demo_data() -> None:
@@ -82,6 +90,15 @@ def seed_demo_data() -> None:
 
     for device in initial_devices:
         devices[device["id"]] = device
+        telemetry_events[device["id"]] = [
+            {
+                "recorded_at": datetime.now(UTC).isoformat(),
+                "temperature_c": 24.5,
+                "battery_percent": 91,
+                "connectivity": "good",
+                "message": "Boot heartbeat",
+            }
+        ]
 
     releases.append(
         {
@@ -119,6 +136,17 @@ def list_devices() -> dict[str, list[dict]]:
     return {"devices": list(devices.values())}
 
 
+@app.get("/devices/{device_id}")
+def get_device(device_id: str) -> dict:
+    if device_id not in devices:
+        raise HTTPException(status_code=404, detail="Device not found")
+    return {
+        "device": devices[device_id],
+        "recent_commands": [item for item in commands if item["device_id"] == device_id][-5:],
+        "telemetry": telemetry_events.get(device_id, [])[-10:],
+    }
+
+
 @app.get("/dashboard/summary")
 def dashboard_summary() -> dict:
     total_devices = len(devices)
@@ -133,6 +161,29 @@ def dashboard_summary() -> dict:
         "queued_commands": len(commands),
         "available_releases": len(releases),
     }
+
+
+@app.get("/dashboard/activity")
+def dashboard_activity() -> dict[str, list[dict]]:
+    activity = []
+    for command in commands[-5:]:
+        activity.append(
+            {
+                "kind": "command",
+                "summary": f"{command['issued_by']} queued {command['command']}",
+                "timestamp": command["created_at"],
+            }
+        )
+    for release in releases[-3:]:
+        activity.append(
+            {
+                "kind": "release",
+                "summary": f"Release {release['version']} available for {release['hardware_target']}",
+                "timestamp": release["created_at"],
+            }
+        )
+    activity.sort(key=lambda item: item["timestamp"], reverse=True)
+    return {"activity": activity[:8]}
 
 
 @app.post("/devices/register")
@@ -154,6 +205,7 @@ def register_device(payload: DeviceRegistrationRequest) -> dict:
         "last_seen_at": datetime.now(UTC).isoformat(),
     }
     devices[device_id] = record
+    telemetry_events[device_id] = []
     return record
 
 
@@ -172,6 +224,22 @@ def issue_command(device_id: str, payload: CommandRequest) -> dict:
     }
     commands.append(command)
     return command
+
+
+@app.post("/devices/{device_id}/telemetry")
+def record_telemetry(device_id: str, payload: TelemetryEvent) -> dict:
+    if device_id not in devices:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    event = payload.model_dump()
+    event["recorded_at"] = datetime.now(UTC).isoformat()
+    telemetry_events.setdefault(device_id, []).append(event)
+    devices[device_id]["last_seen_at"] = event["recorded_at"]
+    if payload.connectivity == "offline":
+        devices[device_id]["status"] = "offline"
+    elif devices[device_id]["status"] == "offline":
+        devices[device_id]["status"] = "online"
+    return event
 
 
 @app.get("/commands")

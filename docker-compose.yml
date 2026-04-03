@@ -13,6 +13,9 @@ services:
     environment:
       ROBUST_AI_PROVIDER: ${ROBUST_AI_PROVIDER:-rule-based}
       ROBUST_AI_MODEL: ${ROBUST_AI_MODEL:-demo-router}
+      ROBUST_OLLAMA_BASE_URL: ${ROBUST_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      ROBUST_OPENAI_COMPAT_BASE_URL: ${ROBUST_OPENAI_COMPAT_BASE_URL:-http://host.docker.internal:8001/v1}
+      ROBUST_LLAMACPP_BASE_URL: ${ROBUST_LLAMACPP_BASE_URL:-http://host.docker.internal:8080}
     ports:
       - "${AI_PORT:-8100}:8100"
 

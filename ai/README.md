@@ -34,6 +34,14 @@ ROBUST_AI_PROVIDER=ollama
 ROBUST_AI_MODEL=qwen2.5:7b
 ```
 
+Optional endpoints:
+
+```bash
+ROBUST_OLLAMA_BASE_URL=http://localhost:11434
+ROBUST_OPENAI_COMPAT_BASE_URL=http://localhost:8001/v1
+ROBUST_LLAMACPP_BASE_URL=http://localhost:8080
+```
+
 ## Local Development
 
 ```bash

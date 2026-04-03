@@ -1,6 +1,6 @@
 # Mock Device
 
-This example simulates a device registering with the backend and issuing a command request path without requiring physical hardware.
+This example simulates a small fleet registering with the backend, publishing telemetry, and issuing a command request path without requiring physical hardware.
 
 ## Run
 
@@ -11,4 +11,3 @@ python3 simulator.py
 ```
 
 By default the simulator targets `http://localhost:8000`.
-

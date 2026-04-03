@@ -21,11 +21,19 @@ const fallbackSummary = {
   available_releases: 3,
 };
 
+const fallbackActivity = [
+  { kind: "command", summary: "system queued sync-config", timestamp: "2026-04-03T12:40:00Z" },
+  { kind: "release", summary: "Release 1.1.0 available for esp32", timestamp: "2026-04-03T12:15:00Z" },
+];
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 export function App() {
   const [devices, setDevices] = useState(fallbackDevices);
   const [summary, setSummary] = useState(fallbackSummary);
+  const [activity, setActivity] = useState(fallbackActivity);
+  const [selectedDevice, setSelectedDevice] = useState(fallbackDevices[0]);
+  const [selectedDetail, setSelectedDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState("Demo data");
 
@@ -34,17 +42,19 @@ export function App() {
 
     async function loadData() {
       try {
-        const [devicesResponse, summaryResponse] = await Promise.all([
+        const [devicesResponse, summaryResponse, activityResponse] = await Promise.all([
           fetch(`${apiBaseUrl}/devices`),
           fetch(`${apiBaseUrl}/dashboard/summary`),
+          fetch(`${apiBaseUrl}/dashboard/activity`),
         ]);
 
-        if (!devicesResponse.ok || !summaryResponse.ok) {
+        if (!devicesResponse.ok || !summaryResponse.ok || !activityResponse.ok) {
           throw new Error("API request failed");
         }
 
         const devicesPayload = await devicesResponse.json();
         const summaryPayload = await summaryResponse.json();
+        const activityPayload = await activityResponse.json();
 
         if (!active) {
           return;
@@ -52,12 +62,15 @@ export function App() {
 
         setDevices(devicesPayload.devices);
         setSummary(summaryPayload);
+        setActivity(activityPayload.activity);
+        setSelectedDevice(devicesPayload.devices[0] ?? fallbackDevices[0]);
         setMode("Live backend");
       } catch {
         if (!active) {
           return;
         }
         setMode("Demo fallback");
+        setSelectedDevice(fallbackDevices[0]);
       } finally {
         if (active) {
           setLoading(false);
@@ -70,6 +83,49 @@ export function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!selectedDevice?.id) {
+      return undefined;
+    }
+
+    async function loadDeviceDetail() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/devices/${selectedDevice.id}`);
+        if (!response.ok) {
+          throw new Error("detail request failed");
+        }
+        const payload = await response.json();
+        if (active) {
+          setSelectedDetail(payload);
+        }
+      } catch {
+        if (active) {
+          setSelectedDetail({
+            device: selectedDevice,
+            recent_commands: [
+              { id: "demo-command", command: "sync-config", status: "queued", issued_by: "system" },
+            ],
+            telemetry: [
+              {
+                recorded_at: "2026-04-03T12:40:00Z",
+                temperature_c: 24.1,
+                battery_percent: 91,
+                connectivity: "good",
+                message: "Demo heartbeat",
+              },
+            ],
+          });
+        }
+      }
+    }
+
+    loadDeviceDetail();
+    return () => {
+      active = false;
+    };
+  }, [selectedDevice]);
 
   return (
     <main className="shell">
@@ -117,14 +173,17 @@ export function App() {
 
         <article className="panel">
           <div className="panelHeader">
-            <h2>AI Action Queue</h2>
-            <span>Human approval required</span>
+            <h2>Recent Activity</h2>
+            <span>Commands and releases</span>
           </div>
           <ul className="actionList">
-            {actions.map((action) => (
-              <li key={action}>
-                <span>{action}</span>
-                <button type="button">Review</button>
+            {activity.map((item, index) => (
+              <li key={`${item.kind}-${item.timestamp}-${index}`}>
+                <span>
+                  <strong>{item.kind}</strong>
+                  <small>{item.summary}</small>
+                </span>
+                <button type="button">Inspect</button>
               </li>
             ))}
           </ul>
@@ -134,7 +193,7 @@ export function App() {
       <section className="panel">
         <div className="panelHeader">
           <h2>Devices</h2>
-          <span>Representative sample</span>
+          <span>Select a device for detail</span>
         </div>
         <div className="tableWrap">
           <table>
@@ -149,7 +208,11 @@ export function App() {
             </thead>
             <tbody>
               {devices.map((device) => (
-                <tr key={device.id}>
+                <tr
+                  key={device.id}
+                  className={device.id === selectedDevice?.id ? "selectedRow" : ""}
+                  onClick={() => setSelectedDevice(device)}
+                >
                   <td>{device.device_uid ?? device.id}</td>
                   <td>{String(device.device_type).toUpperCase()}</td>
                   <td>{device.firmware_version}</td>
@@ -162,6 +225,83 @@ export function App() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="grid detailGrid">
+        <article className="panel">
+          <div className="panelHeader">
+            <h2>Device Detail</h2>
+            <span>{selectedDevice?.device_uid ?? selectedDevice?.id ?? "No selection"}</span>
+          </div>
+          <div className="detailCard">
+            <div>
+              <strong>Site</strong>
+              <span>{selectedDetail?.device?.site ?? selectedDevice?.site}</span>
+            </div>
+            <div>
+              <strong>Firmware</strong>
+              <span>{selectedDetail?.device?.firmware_version ?? selectedDevice?.firmware_version}</span>
+            </div>
+            <div>
+              <strong>Status</strong>
+              <span>{selectedDetail?.device?.status ?? selectedDevice?.status}</span>
+            </div>
+            <div>
+              <strong>Last Seen</strong>
+              <span>{selectedDetail?.device?.last_seen_at ?? "n/a"}</span>
+            </div>
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="panelHeader">
+            <h2>AI Action Queue</h2>
+            <span>Human approval required</span>
+          </div>
+          <ul className="actionList">
+            {actions.map((action) => (
+              <li key={action}>
+                <span>
+                  <strong>suggested</strong>
+                  <small>{action}</small>
+                </span>
+                <button type="button">Review</button>
+              </li>
+            ))}
+          </ul>
+        </article>
+      </section>
+
+      <section className="grid detailGrid">
+        <article className="panel">
+          <div className="panelHeader">
+            <h2>Recent Commands</h2>
+            <span>Selected device</span>
+          </div>
+          <ul className="detailList">
+            {(selectedDetail?.recent_commands ?? []).map((command) => (
+              <li key={command.id}>
+                <strong>{command.command}</strong>
+                <span>{command.issued_by} · {command.status}</span>
+              </li>
+            ))}
+          </ul>
+        </article>
+
+        <article className="panel">
+          <div className="panelHeader">
+            <h2>Telemetry</h2>
+            <span>Latest samples</span>
+          </div>
+          <ul className="detailList">
+            {(selectedDetail?.telemetry ?? []).map((entry, index) => (
+              <li key={`${entry.recorded_at}-${index}`}>
+                <strong>{entry.temperature_c ?? "--"}C / {entry.battery_percent ?? "--"}%</strong>
+                <span>{entry.connectivity} · {entry.message ?? "heartbeat"}</span>
+              </li>
+            ))}
+          </ul>
+        </article>
       </section>
     </main>
   );

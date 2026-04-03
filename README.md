@@ -160,6 +160,7 @@ This repository is currently scaffolded as a multi-service project with separate
 - provider-agnostic AI layer with free local fallback
 - self-hostable development stack
 - mock device simulator for contributors without hardware
+- self-hosted model adapter path for Ollama, llama.cpp, or OpenAI-compatible APIs
 - open protocol and threat-model documentation
 
 See:

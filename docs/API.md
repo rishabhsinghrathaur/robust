@@ -38,9 +38,32 @@ Example payload:
 }
 ```
 
+### `GET /devices/{device_id}`
+
+Returns a selected device plus recent commands and telemetry samples.
+
+### `POST /devices/{device_id}/telemetry`
+
+Stores a telemetry event for a registered device and refreshes its last-seen state.
+
+Example payload:
+
+```json
+{
+  "temperature_c": 24.5,
+  "battery_percent": 91,
+  "connectivity": "good",
+  "message": "Boot heartbeat"
+}
+```
+
 ### `GET /dashboard/summary`
 
 Returns fleet counters used by the dashboard.
+
+### `GET /dashboard/activity`
+
+Returns recent command and release events for the dashboard activity feed.
 
 ### `POST /ota/releases`
 
@@ -72,7 +95,15 @@ Example payload:
 
 Returns a structured action plan with approval status. It does not directly control hardware.
 
+## Provider Adapters
+
+The AI service can run in:
+
+- `rule-based` mode for free local fallback
+- `ollama` mode against `ROBUST_OLLAMA_BASE_URL`
+- `openai-compatible` mode against `ROBUST_OPENAI_COMPAT_BASE_URL`
+- `llama-cpp` mode against `ROBUST_LLAMACPP_BASE_URL`
+
 ## Design Rule
 
 AI outputs are advisory. Device execution must still pass backend authorization and policy checks.
-

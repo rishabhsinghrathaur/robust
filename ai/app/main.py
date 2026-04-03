@@ -39,15 +39,8 @@ class ProviderStatus(BaseModel):
     mode: str
 
 
-def infer_action(message: str) -> SuggestedAction:
-    provider = get_provider()
+def _rule_based_action(message: str, base: dict[str, str]) -> SuggestedAction:
     normalized = message.lower()
-    base = {
-        "provider": provider.name,
-        "model": provider.model,
-        "execution_mode": provider.mode,
-    }
-
     if "update" in normalized or "firmware" in normalized:
         return SuggestedAction(
             action_type="ota_rollout",
@@ -83,6 +76,29 @@ def infer_action(message: str) -> SuggestedAction:
         confidence=0.68,
         **base,
     )
+
+
+def infer_action(message: str) -> SuggestedAction:
+    provider = get_provider()
+    base = {
+        "provider": provider.name,
+        "model": provider.model,
+        "execution_mode": provider.mode,
+    }
+    provider_result = provider.interpret(message)
+    if provider_result:
+        try:
+            return SuggestedAction(
+                action_type=provider_result["action_type"],
+                target_scope=provider_result["target_scope"],
+                summary=provider_result["summary"],
+                requires_approval=bool(provider_result["requires_approval"]),
+                confidence=float(provider_result["confidence"]),
+                **base,
+            )
+        except (KeyError, TypeError, ValueError):
+            pass
+    return _rule_based_action(message, base)
 
 
 @app.get("/health")
