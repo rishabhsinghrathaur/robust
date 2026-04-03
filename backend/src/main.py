@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from .auth import AuthContext, require_role
 from .db import AUTO_CREATE_SCHEMA, AUTO_SEED_DEMO_DATA, Base, SessionLocal, engine
-from .models import Command, Device, OtaRelease, TelemetryRecord
+from .models import ApprovalRequest, AuditEvent, Command, Device, OtaRelease, TelemetryRecord
 
 
 app = FastAPI(
@@ -50,6 +50,16 @@ class TelemetryEvent(BaseModel):
     battery_percent: int | None = None
     connectivity: str = "good"
     message: str | None = None
+
+
+class ProposedCommandRequest(BaseModel):
+    command: str = Field(..., min_length=2)
+    issued_by: str = Field(..., min_length=2)
+    reason: str = Field(..., min_length=4)
+
+
+class ApprovalDecisionRequest(BaseModel):
+    note: str = Field(default="")
 
 
 def now_iso() -> str:
@@ -98,6 +108,55 @@ def serialize_telemetry(record: TelemetryRecord) -> dict:
         "connectivity": record.connectivity,
         "message": record.message,
     }
+
+
+def serialize_approval(approval: ApprovalRequest) -> dict:
+    return {
+        "id": approval.id,
+        "command_id": approval.command_id,
+        "requested_by": approval.requested_by,
+        "reason": approval.reason,
+        "status": approval.status,
+        "approved_by": approval.approved_by,
+        "decided_at": approval.decided_at,
+        "created_at": approval.created_at,
+    }
+
+
+def serialize_audit_event(event: AuditEvent) -> dict:
+    return {
+        "id": event.id,
+        "actor": event.actor,
+        "actor_role": event.actor_role,
+        "event_type": event.event_type,
+        "target_type": event.target_type,
+        "target_id": event.target_id,
+        "summary": event.summary,
+        "created_at": event.created_at,
+    }
+
+
+def record_audit(
+    session,
+    *,
+    actor: str,
+    actor_role: str,
+    event_type: str,
+    target_type: str,
+    target_id: str,
+    summary: str,
+) -> None:
+    session.add(
+        AuditEvent(
+            actor=actor,
+            actor_role=actor_role,
+            event_type=event_type,
+            target_type=target_type,
+            target_id=target_id,
+            summary=summary,
+            created_at=now_iso(),
+        )
+    )
 
 
 def seed_demo_data() -> None:
@@ -158,6 +217,29 @@ def seed_demo_data() -> None:
                 created_at=now_iso(),
             )
         )
+        session.flush()
+        queued_command = session.scalar(select(Command).where(Command.device_id == initial_devices[0].id).limit(1))
+        if queued_command:
+            session.add(
+                ApprovalRequest(
+                    command_id=queued_command.id,
+                    requested_by="system",
+                    reason="Bootstrap review of seeded sync workflow",
+                    status="approved",
+                    approved_by="system",
+                    decided_at=now_iso(),
+                    created_at=now_iso(),
+                )
+            )
+            record_audit(
+                session,
+                actor="system",
+                actor_role="admin",
+                event_type="command.seeded",
+                target_type="command",
+                target_id=queued_command.id,
+                summary="Seeded command and approval example created.",
+            )
         for device in initial_devices:
             session.add(
                 TelemetryRecord(
@@ -264,6 +346,22 @@ def dashboard_activity() -> dict[str, list[dict]]:
         return {"activity": activity[:8]}
 
 
+@app.get("/approvals/pending")
+def list_pending_approvals(_: AuthContext = Depends(require_role("viewer"))) -> dict[str, list[dict]]:
+    with SessionLocal() as session:
+        approvals = session.scalars(
+            select(ApprovalRequest).where(ApprovalRequest.status == "pending").order_by(ApprovalRequest.created_at.desc())
+        ).all()
+        return {"approvals": [serialize_approval(approval) for approval in approvals]}
+
+
+@app.get("/audit/events")
+def list_audit_events(_: AuthContext = Depends(require_role("viewer"))) -> dict[str, list[dict]]:
+    with SessionLocal() as session:
+        events = session.scalars(select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(50)).all()
+        return {"events": [serialize_audit_event(event) for event in events]}
+
+
 @app.post("/devices/register")
 def register_device(payload: DeviceRegistrationRequest) -> dict:
     with SessionLocal() as session:
@@ -274,6 +372,15 @@ def register_device(payload: DeviceRegistrationRequest) -> dict:
             existing.site = payload.site
             existing.device_type = payload.device_type
             existing.status = "online"
+            record_audit(
+                session,
+                actor=payload.device_uid,
+                actor_role="device",
+                event_type="device.reregistered",
+                target_type="device",
+                target_id=existing.id,
+                summary=f"Device {payload.device_uid} refreshed registration.",
+            )
             session.commit()
             session.refresh(existing)
             return serialize_device(existing)
@@ -288,6 +395,15 @@ def register_device(payload: DeviceRegistrationRequest) -> dict:
             last_seen_at=now_iso(),
         )
         session.add(device)
+        record_audit(
+            session,
+            actor=payload.device_uid,
+            actor_role="device",
+            event_type="device.registered",
+            target_type="device",
+            target_id=device.id,
+            summary=f"Device {payload.device_uid} registered at site {payload.site}.",
+        )
         session.commit()
         session.refresh(device)
         return serialize_device(device)
@@ -313,9 +429,64 @@ def issue_command(
             created_at=now_iso(),
         )
         session.add(command)
+        record_audit(
+            session,
+            actor=payload.issued_by,
+            actor_role="operator",
+            event_type="command.queued",
+            target_type="command",
+            target_id=command.id,
+            summary=f"Command '{payload.command}' queued for device {device.device_uid}.",
+        )
         session.commit()
         session.refresh(command)
         return serialize_command(command)
+
+
+@app.post("/devices/{device_id}/commands/propose")
+def propose_command(
+    device_id: str,
+    payload: ProposedCommandRequest,
+    _: AuthContext = Depends(require_role("operator")),
+) -> dict:
+    with SessionLocal() as session:
+        device = session.get(Device, device_id)
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+
+        command = Command(
+            id=str(uuid4()),
+            device_id=device_id,
+            command=payload.command,
+            issued_by=payload.issued_by,
+            status="pending_approval",
+            created_at=now_iso(),
+        )
+        session.add(command)
+        session.flush()
+
+        approval = ApprovalRequest(
+            command_id=command.id,
+            requested_by=payload.issued_by,
+            reason=payload.reason,
+            status="pending",
+            created_at=now_iso(),
+        )
+        session.add(approval)
+        session.flush()
+        record_audit(
+            session,
+            actor=payload.issued_by,
+            actor_role="operator",
+            event_type="approval.requested",
+            target_type="approval",
+            target_id=str(approval.id),
+            summary=f"Approval requested for command '{payload.command}' on device {device.device_uid}.",
+        )
+        session.commit()
+        session.refresh(command)
+        session.refresh(approval)
+        return {"command": serialize_command(command), "approval": serialize_approval(approval)}
 
 
 @app.post("/devices/{device_id}/telemetry")
@@ -351,10 +522,82 @@ def list_commands(_: AuthContext = Depends(require_role("viewer"))) -> dict[str,
         return {"commands": [serialize_command(command) for command in commands]}
 
 
+@app.post("/approvals/{approval_id}/approve")
+def approve_command(
+    approval_id: int,
+    payload: ApprovalDecisionRequest,
+    context: AuthContext = Depends(require_role("admin")),
+) -> dict:
+    with SessionLocal() as session:
+        approval = session.get(ApprovalRequest, approval_id)
+        if not approval:
+            raise HTTPException(status_code=404, detail="Approval request not found")
+        if approval.status != "pending":
+            raise HTTPException(status_code=409, detail="Approval request already decided")
+
+        command = session.get(Command, approval.command_id)
+        if not command:
+            raise HTTPException(status_code=404, detail="Command not found")
+
+        approval.status = "approved"
+        approval.approved_by = context.token_name
+        approval.decided_at = now_iso()
+        command.status = "queued"
+        record_audit(
+            session,
+            actor=context.token_name,
+            actor_role=context.role,
+            event_type="approval.approved",
+            target_type="approval",
+            target_id=str(approval.id),
+            summary=f"Approval granted for command '{command.command}'. {payload.note}".strip(),
+        )
+        session.commit()
+        session.refresh(approval)
+        session.refresh(command)
+        return {"command": serialize_command(command), "approval": serialize_approval(approval)}
+
+
+@app.post("/approvals/{approval_id}/reject")
+def reject_command(
+    approval_id: int,
+    payload: ApprovalDecisionRequest,
+    context: AuthContext = Depends(require_role("admin")),
+) -> dict:
+    with SessionLocal() as session:
+        approval = session.get(ApprovalRequest, approval_id)
+        if not approval:
+            raise HTTPException(status_code=404, detail="Approval request not found")
+        if approval.status != "pending":
+            raise HTTPException(status_code=409, detail="Approval request already decided")
+
+        command = session.get(Command, approval.command_id)
+        if not command:
+            raise HTTPException(status_code=404, detail="Command not found")
+
+        approval.status = "rejected"
+        approval.approved_by = context.token_name
+        approval.decided_at = now_iso()
+        command.status = "rejected"
+        record_audit(
+            session,
+            actor=context.token_name,
+            actor_role=context.role,
+            event_type="approval.rejected",
+            target_type="approval",
+            target_id=str(approval.id),
+            summary=f"Approval rejected for command '{command.command}'. {payload.note}".strip(),
+        )
+        session.commit()
+        session.refresh(approval)
+        session.refresh(command)
+        return {"command": serialize_command(command), "approval": serialize_approval(approval)}
+
+
 @app.post("/ota/releases")
 def create_release(
     payload: OtaReleaseRequest,
-    _: AuthContext = Depends(require_role("admin")),
+    context: AuthContext = Depends(require_role("admin")),
 ) -> dict:
     with SessionLocal() as session:
         release = OtaRelease(
@@ -366,6 +609,15 @@ def create_release(
             created_at=now_iso(),
         )
         session.add(release)
+        record_audit(
+            session,
+            actor=context.token_name,
+            actor_role=context.role,
+            event_type="ota.release_created",
+            target_type="ota_release",
+            target_id=release.id,
+            summary=f"OTA release {payload.version} created for {payload.hardware_target}.",
+        )
         session.commit()
         session.refresh(release)
         return serialize_release(release)

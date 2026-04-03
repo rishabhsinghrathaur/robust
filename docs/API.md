@@ -39,6 +39,21 @@ Example payload:
 }
 ```
 
+### `POST /devices/{device_id}/commands/propose`
+
+Creates a command in `pending_approval` state and opens an approval request.
+Requires bearer token with at least `operator` role.
+
+Example payload:
+
+```json
+{
+  "command": "reboot",
+  "issued_by": "operator@example",
+  "reason": "Device is unresponsive after config push"
+}
+```
+
 ### `GET /devices/{device_id}`
 
 Returns a selected device plus recent commands and telemetry samples.
@@ -84,6 +99,26 @@ Requires bearer token with at least `viewer` role.
 ### `GET /auth/whoami`
 
 Returns the resolved role for the current bearer token.
+
+### `GET /approvals/pending`
+
+Returns pending approval requests.
+Requires bearer token with at least `viewer` role.
+
+### `POST /approvals/{approval_id}/approve`
+
+Approves a pending command request and moves the command to `queued`.
+Requires bearer token with `admin` role.
+
+### `POST /approvals/{approval_id}/reject`
+
+Rejects a pending command request and marks the command as `rejected`.
+Requires bearer token with `admin` role.
+
+### `GET /audit/events`
+
+Returns recent audit events for traceability.
+Requires bearer token with at least `viewer` role.
 
 ## AI Service
 

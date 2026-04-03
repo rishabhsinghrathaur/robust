@@ -33,6 +33,10 @@ class Command(Base):
     created_at: Mapped[str] = mapped_column(String(64), index=True)
 
     device: Mapped[Device] = relationship(back_populates="commands")
+    approvals: Mapped[list["ApprovalRequest"]] = relationship(
+        back_populates="command",
+        cascade="all, delete-orphan",
+    )
 
 
 class OtaRelease(Base):
@@ -58,3 +62,31 @@ class TelemetryRecord(Base):
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     device: Mapped[Device] = relationship(back_populates="telemetry_events")
+
+
+class ApprovalRequest(Base):
+    __tablename__ = "approval_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    command_id: Mapped[str] = mapped_column(ForeignKey("commands.id"), index=True)
+    requested_by: Mapped[str] = mapped_column(String(128))
+    reason: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    approved_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    decided_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[str] = mapped_column(String(64), index=True)
+
+    command: Mapped[Command] = relationship(back_populates="approvals")
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    actor: Mapped[str] = mapped_column(String(128))
+    actor_role: Mapped[str] = mapped_column(String(32))
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    target_type: Mapped[str] = mapped_column(String(64))
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    summary: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[str] = mapped_column(String(64), index=True)

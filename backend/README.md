@@ -53,6 +53,24 @@ From the `backend/` directory:
 alembic upgrade head
 ```
 
+## Approval Workflow
+
+High-risk commands can go through an explicit approval path:
+
+1. Operator proposes a command.
+2. Backend stores a pending approval request.
+3. Admin approves or rejects it.
+4. Command state is updated and an audit event is recorded.
+
+Audit history can be queried through the backend for traceability.
+
+Key routes:
+
+- `POST /devices/{device_id}/commands/propose`
+- `POST /approvals/{approval_id}/approve`
+- `POST /approvals/{approval_id}/reject`
+- `GET /audit/events`
+
 ## Local Development
 
 ```bash
