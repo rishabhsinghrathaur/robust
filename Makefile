@@ -14,3 +14,5 @@ dashboard:
 check:
 	$(PYTHON) -m py_compile backend/src/main.py ai/app/main.py
 
+mock-device:
+	cd examples/mock-device && $(PYTHON) simulator.py

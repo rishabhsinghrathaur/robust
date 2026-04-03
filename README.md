@@ -139,6 +139,7 @@ This repository is currently scaffolded as a multi-service project with separate
 - `dashboard`: React + Vite operator dashboard
 - `ai`: FastAPI service that converts natural language into structured, reviewable device actions
 - `firmware`: reference layout for ESP32 and STM32 device firmware
+- `examples/mock-device`: hardware-free simulator for demos and contributor onboarding
 
 ### Quick Start
 
@@ -153,6 +154,19 @@ This repository is currently scaffolded as a multi-service project with separate
 - GitHub Actions CI runs on pushes and pull requests through [ci.yml](/home/rishabh/Desktop/current%20projects%20/robust/.github/workflows/ci.yml)
 - container build paths are defined for backend, dashboard, and AI services
 - deployment guidance is outlined in [docs/DEPLOYMENT.md](/home/rishabh/Desktop/current%20projects%20/robust/docs/DEPLOYMENT.md)
+
+### Open Source Direction
+
+- provider-agnostic AI layer with free local fallback
+- self-hostable development stack
+- mock device simulator for contributors without hardware
+- open protocol and threat-model documentation
+
+See:
+
+- [docs/OPEN_SOURCE_STRATEGY.md](/home/rishabh/Desktop/current%20projects%20/robust/docs/OPEN_SOURCE_STRATEGY.md)
+- [docs/API.md](/home/rishabh/Desktop/current%20projects%20/robust/docs/API.md)
+- [docs/THREAT_MODEL.md](/home/rishabh/Desktop/current%20projects%20/robust/docs/THREAT_MODEL.md)
 
 ## Feedback and Improvement Areas
 

@@ -10,6 +10,9 @@ services:
   ai:
     build:
       context: ./ai
+    environment:
+      ROBUST_AI_PROVIDER: ${ROBUST_AI_PROVIDER:-rule-based}
+      ROBUST_AI_MODEL: ${ROBUST_AI_MODEL:-demo-router}
     ports:
       - "${AI_PORT:-8100}:8100"
 
@@ -44,4 +47,3 @@ services:
 
 volumes:
   postgres_data:
-
